@@ -22,8 +22,8 @@ def create_memo(memo:Memo):
 # 기본값 설정: 쿼리 매개변수에 기본값을 지정할 수 있습니다. 매개변수가 요청에 포함되지 않으면 기본값이 사용됩니다.
 # 유효성 검사: 추가적인 제약 조건을 지정하여 쿼리 매개변수의 값이 유효한지 검사할 수 있습니다. 예를 들어, Query(..., gt=0)는 값을 0보다 큰 값으로 제한합니다.
 @app.get("/memos")
-def read_momo(sorted: str = None,
-              sort_by: str = None):
+def read_momo(sorted: str = Query(None, description="Sort order (ASC or DESC)"),
+              sort_by: str = Query(None, description="Property to sort by (id, content, etc.)")):
         print('sorted:', sorted)
         print('sort_by:', sort_by)
         sorted_memos = memos.copy()
@@ -34,7 +34,7 @@ def read_momo(sorted: str = None,
         if sorted and sort_by:
             if sort_by in Memo.__fields__:
                 sorted_memos.sort(key=lambda x: getattr(x, sort_by))
-                # sorted_memos.sort(sort_by) 
+                # sorted_memos.sort(key: sort_by) 
                 if sorted.upper() == "DESC":
                     sorted_memos.reverse()
         
