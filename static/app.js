@@ -27,17 +27,17 @@ async function editMemo(event) {
 function displayMemos(memo) {
   const ul = document.querySelector("#memo-ul");
   const li = document.createElement("li");
-  li.innerText = `[id:${memo.id} ${memo.content}]`;
+  li.innerText = `[id: ${memo.id}]-----[content: ${memo.content}]`;
 
   const editBtn = document.createElement("button");
   editBtn.innerText = "수정";
   editBtn.addEventListener("click", editMemo);
-  editBtn.dataset.id = memo.id;
+  editBtn.dataset.id = memo._id;
 
   const delBtn = document.createElement("button");
   delBtn.innerText = "삭제";
   delBtn.addEventListener("click", deleteMemo);
-  delBtn.dataset.id = memo.id;
+  delBtn.dataset.id = memo._id;
 
   li.appendChild(editBtn);
   li.appendChild(delBtn);
@@ -49,8 +49,8 @@ async function readMemo() {
   const jsonRes = await res.json();
   const ul = document.querySelector("#memo-ul");
   ul.innerHTML = "";
-
-  jsonRes.map((memo) => displayMemos(memo));
+  console.log(jsonRes.memos);
+  jsonRes.memos.forEach((memo) => displayMemos(memo));
 }
 
 async function createMemo(value) {

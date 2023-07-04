@@ -1,6 +1,25 @@
 from fastapi import FastAPI, Query
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
+from pymongo import MongoClient
+from dotenv import load_dotenv
+from bson import ObjectId
+import os
+import certifi
+
+# .env 파일 로드
+load_dotenv()
+
+ca = certifi.where()
+
+# 환경 변수 사용
+mongodb_url = os.getenv('MONGODB_URL')
+# MongoDB 연결
+client = MongoClient(mongodb_url, tlsCAFile=ca)
+db = client["memo"]  # 클러스터안의 Database 이름
+collection = db["memo"]  # Database 안의 컬렉션 이름
 
 class Memo(BaseModel):
     id:str
@@ -13,7 +32,12 @@ app = FastAPI()
 
 @app.post("/memos")
 def create_memo(memo:Memo):
-    memos.append(memo)
+    datum = {
+        "id": memo.id,
+        "content": memo.content
+    }
+    result = collection.insert_one(datum)
+    print(result.inserted_id)
     return 'success'
 
  # Query() FastAPI에서 제공하는 쿼리 매개변수의 유효성 검사 및 기본값을 설정하기 위한 도우미 함수
@@ -26,36 +50,65 @@ def read_momo(sorted: str = Query(None, description="Sort order (ASC or DESC)"),
               sort_by: str = Query(None, description="Property to sort by (id, content, etc.)")):
         print('sorted:', sorted)
         print('sort_by:', sort_by)
-        sorted_memos = memos.copy()
-    
-    #key=lambda x: getattr(x, sort_by)에서 lambda x는 람다 함수를 정의하는 구문입니다. 
-    #여기서 x는 sorted_memos 리스트의 각 요소를 의미하게 됩니다. 
-    #따라서, key 함수는 정렬할 때 sorted_memos의 각 요소를 x로 받아와서 해당 요소의 sort_by로 지정된 속성 값을 가져오게 됩니다.
-        if sorted and sort_by:
-            if sort_by in Memo.__fields__:
-                sorted_memos.sort(key=lambda x: getattr(x, sort_by))
-                # sorted_memos.sort(key: sort_by) 
-                if sorted.upper() == "DESC":
-                    sorted_memos.reverse()
+        #sorted_memos = memos.copy()
         
-        return sorted_memos
+        # MongoDB에서 데이터 조회
+        memos = list(collection.find({}))
+        
+        # _id 값을 문자열로 변환
+        for memo in memos:
+            memo["_id"] = str(memo["_id"])
+        print(memos)
+        
+    # #key=lambda x: getattr(x, sort_by)에서 lambda x는 람다 함수를 정의하는 구문입니다. 
+    # #여기서 x는 sorted_memos 리스트의 각 요소를 의미하게 됩니다. 
+    # #따라서, key 함수는 정렬할 때 sorted_memos의 각 요소를 x로 받아와서 해당 요소의 sort_by로 지정된 속성 값을 가져오게 됩니다.
+        if sorted and sort_by:
+            if sort_by == "id" or sort_by == "content":
+                # memos.sort(key=lambda x: getattr(x, sort_by))
+                memos.sort(key=lambda x: x[sort_by])
+                if sorted.upper() == "DESC":
+                    memos.reverse()
+        
+        return JSONResponse({"memos": jsonable_encoder(memos)})
+
+
+            
 
 @app.put("/memos/{memo_id}")
-def put_memo(req:Memo):
-    print(req)
-    for m in memos:
-        if m.id == req.id:
-            m.content = req.content
-            return 'success'
-    return '그런 메모 없음'
+def put_memo(req:Memo, memo_id):
+    # print(req)
+    # for m in memos:
+    #     if m.id == req.id:
+    #         m.content = req.content
+    #         return 'success'
+    # return '그런 메모 없음'
+    
+    # ObjectId로 변환
+    memo_id = ObjectId(memo_id)
+    print('수정할 objectId:', memo_id)
+    result = collection.find_one_and_update({"_id": memo_id}, {'$set': {'content': req.content}})
+    if result is not None:
+        return {"message": "success"}
+    else:
+        return '그런 메모 없음'
 
 @app.delete("/memos/{memo_id}")
 def delete_memo(memo_id):
     #enumerate 로 감싸야 index와 요소를 같이 뽑아준다.
-    for index, memo in enumerate(memos):
-        if memo.id==memo_id:
-            memos.pop(index)
-            return 'success'
-    return '그런 메모 없음'
+    # for index, memo in enumerate(memos):
+    #     if memo.id==memo_id:
+    #         memos.pop(index)
+    #         return 'success'
+    # return '그런 메모 없음'
+    
+    # ObjectId로 변환
+    memo_id = ObjectId(memo_id)
+    print('삭제할 objectId:', memo_id)
+    result = collection.delete_one({"_id": memo_id})
+    if result.deleted_count == 1:
+        return {"message": "success"}
+    else:
+        return '그런 메모 없음'
 
 app.mount('/', StaticFiles(directory='static', html=True), name='static')
